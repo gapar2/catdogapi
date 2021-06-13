@@ -35,6 +35,7 @@ def cat_or_dog(image_data):
                         ProjectVersionArn=MODEL_ARN,
                         Image={'Bytes':image_data},
                         MaxResults=2)
+    logger.info(f"Full response: {response}")
 
     return response
 
@@ -89,11 +90,11 @@ def handler(event, context):
     message = f"Request from {user_name} received"
     send_message(message)
     
-    # We increment the count of requests for that given user
-    increment_user_count(api_key)
-    
     # We call Rekognition to get classification
     returned_body = cat_or_dog(image_data)
+    
+    # We increment the count of requests for that given user
+    increment_user_count(api_key)
     
     return {'statusCode': 200,
             'body': json.dumps(returned_body),
