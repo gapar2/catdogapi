@@ -26,17 +26,19 @@ ddb_client = boto3.client('dynamodb')
 MODEL_ARN = "arn:aws:rekognition:us-east-1:447262884034:project/catdog-custom-labels/version/catdog-custom-labels.2020-03-07T11.57.47/1583610953438"
 
 # The name of the DynamoDB table with users/api key information
-DDB_TABLE = "awscodestar-catdog-infrastructure-User-1CRZT7NCN70OC"
+DDB_TABLE = "awscodestar-catdog-infrastructure-User-T7C76D6SAYQC"
 
 def cat_or_dog(image_data):
     """ Returns whether an image is a cat or dog """
-
+    logger.info("Will detect custom labels.")
+    logger.info(image_data)
+    
     response = rek_client.detect_custom_labels(
                         ProjectVersionArn=MODEL_ARN,
                         Image={'Bytes':image_data},
                         MaxResults=2)
     logger.info(f"Full response: {response}")
-
+    
     return response
 
 def send_message(message):
@@ -51,14 +53,14 @@ def get_user_name(api_key):
     return response["Item"]["user_name"]["S"]
 
 
-def increment_user_count(api_key):
+def increment_user_count(api_key, label):
     """ Increments the count for a given user """
     response = ddb_client.update_item(
         TableName=DDB_TABLE,
         Key={
             'api_key': {"S":api_key}
         },
-        UpdateExpression="set request_count = request_count + :val",
+        UpdateExpression=f"set {label}_request_count = {label}_request_count + :val",
         ExpressionAttributeValues={
             ':val': {"N": "1"}
         },
@@ -67,6 +69,16 @@ def increment_user_count(api_key):
     return response
     
 
+def highest_confidence(full_response):
+    """ Returns which label has highest confidence """
+    
+    # First we rank the labels by confidence
+    ranked = sorted(full_response['CustomLabels'], key=lambda x: x['Confidence'], reverse=True)
+    
+    # We keep the one with highest confidence, and return the label name
+    return ranked[0]["Name"]
+
+
 # Had to follow those instructions to get binary image passed properly via API Gateway
 # https://aws.amazon.com/blogs/compute/binary-support-for-api-integrations-with-amazon-api-gateway/
 def handler(event, context):
@@ -74,6 +86,7 @@ def handler(event, context):
     
     # We log the whole event
     logger.info(event)
+    logger.info(list(event.keys()))
     
     # We get the image from the body payload
     b64_image_data = event["base64Image"]
@@ -92,9 +105,10 @@ def handler(event, context):
     
     # We call Rekognition to get classification
     returned_body = cat_or_dog(image_data)
+    label = highest_confidence(returned_body)
     
     # We increment the count of requests for that given user
-    increment_user_count(api_key)
+    increment_user_count(api_key, label)
     
     return {'statusCode': 200,
             'body': json.dumps(returned_body),

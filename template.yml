@@ -38,11 +38,6 @@ Resources:
         - LambdaExecutionRole
         - Arn
       Events:
-        GetEvent:
-          Type: Api
-          Properties:
-            Path: /catdog
-            Method: get
         PostEvent:
           Type: Api
           Properties:
@@ -81,7 +76,7 @@ Resources:
     Properties: 
       DisplayName: CatDog-Ops
       Subscription: 
-        - Endpoint: catdog@gpse.consulting
+        - Endpoint: catdogapi@gpse.consulting
           Protocol: email
       TopicName: CatDogTopic
   User:
